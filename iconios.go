@@ -6,7 +6,25 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"path"
+
+	"github.com/satori/go.uuid"
 )
+
+// PageData contains main information that needed to render page
+type PageData struct {
+	ID  string
+	URL string
+}
+
+// PageDataFromRequest creates new pageData from values provided in request
+func PageDataFromRequest(r *http.Request) PageData {
+	return PageData{
+		ID:  r.PostFormValue("id"),
+		URL: r.PostFormValue("url"),
+	}
+}
 
 const (
 	_        = iota             // ignore first value by assigning to blank identifier
@@ -19,61 +37,94 @@ const (
 )
 
 func main() {
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	fs := http.FileServer(http.Dir("test"))
+	fs := http.FileServer(http.Dir("storage"))
 
-	http.HandleFunc("/", encodeHandler)
-	http.Handle("/test/", http.StripPrefix("/test", fs))
+	http.Handle("/", indexHandler())
+	http.Handle("/finish/", finishHandler())
+	http.Handle("/opn/", http.StripPrefix("/opn", fs))
 
 	http.ListenAndServe(":"+port, nil)
 }
 
-func encodeHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		t, _ := template.ParseFiles("content/index.html")
-		t.Execute(w, nil)
-	} else {
-		var data struct {
-			ID  string
-			URL string
+func finishHandler() http.Handler {
+	hander := func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			r.ParseMultipartForm(256)
+			data := PageDataFromRequest(r)
+			wrkDir := path.Join("storage", data.ID)
+			os.Remove(path.Join(wrkDir, "icon.png"))
+			templateToFile("./tmpl/index_conf.html", path.Join(wrkDir, "index.html"), data)
+			http.Redirect(w, r, "/opn/"+data.ID, 302)
 		}
-		data.ID = "test"
-		r.ParseMultipartForm(2 * MB)
-		file, _, err := r.FormFile("uploadfile")
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		defer file.Close()
-
-		f, err := os.OpenFile("./test/icon.png", os.O_WRONLY|os.O_CREATE, 0666)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		defer f.Close()
-
-		io.Copy(f, file)
-
-		hfile, err := os.OpenFile("./test/index.html", os.O_WRONLY|os.O_CREATE, 0666)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		defer hfile.Close()
-
-		data.URL = r.FormValue("url")
-
-		t, _ := template.ParseFiles("./tmpl/index.html")
-		t.Execute(hfile, data)
-
-		http.Redirect(w, r, "/", 301)
 	}
 
+	return http.HandlerFunc(hander)
+}
+
+func indexHandler() http.Handler {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			t, _ := template.ParseFiles("content/index.html")
+			t.Execute(w, nil)
+		case http.MethodPost:
+			err := r.ParseMultipartForm(2 * MB)
+			if err != nil {
+				return
+			}
+
+			data := PageData{ID: uuid.NewV4().String(), URL: r.FormValue("url")}
+			wrkDir := path.Join("storage", data.ID)
+
+			err = os.MkdirAll(wrkDir, 0744)
+			iconPath := path.Join(wrkDir, "icon.png")
+			htmlPath := path.Join(wrkDir, "index.html")
+
+			file, _, err := r.FormFile("uploadfile")
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			defer file.Close()
+
+			err = saveFile(file, iconPath)
+			err = templateToFile("./tmpl/index.html", htmlPath, data)
+
+			http.Redirect(w, r, "/opn/"+data.ID, 301)
+		}
+	}
+
+	return http.HandlerFunc(handler)
+}
+
+func saveFile(src io.ReadCloser, dest string) error {
+	f, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, src)
+	return err
+}
+
+func templateToFile(templateFilename string, filename string, data interface{}) error {
+	hfile, err := os.OpenFile(filename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer hfile.Close()
+
+	t, err := template.ParseFiles(templateFilename)
+	if err != nil {
+		return err
+	}
+
+	return t.Execute(hfile, data)
 }

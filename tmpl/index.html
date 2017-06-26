@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Document</title>
-    <link rel="apple-touch-icon" href="{{ .ID }}/icon.png">
-    <meta http-equiv="refresh" content="10; url={{ .URL }}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="apple-touch-icon" href="icon.png">
 </head>
 <body>
-    Redirecting to {{ .URL }}
+    <form id="form" enctype="multipart/form-data" action="/finish/" method="POST">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="url" value="{{ .URL }}">
+        <button type="submit" style="display: block; width: 100%;">Finish</button>
+    </form>
 </body>
 </html>
