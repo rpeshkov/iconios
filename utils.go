@@ -27,17 +27,12 @@ func saveFile(src io.ReadCloser, dest string) error {
 	return err
 }
 
-func templateToFile(templateFilename string, filename string, data interface{}) error {
+func saveTemplateToFile(filename string, t *template.Template, name string, data interface{}) error {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	t, err := template.ParseFiles(templateFilename)
-	if err != nil {
-		return err
-	}
-
-	return t.Execute(f, data)
+	return t.ExecuteTemplate(f, name, data)
 }

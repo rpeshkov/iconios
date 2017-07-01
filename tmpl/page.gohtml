@@ -1,0 +1,21 @@
+{{ define "page" }}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="apple-touch-icon" href="icon.png">
+</head>
+<body>
+    <form id="form" enctype="multipart/form-data" action="/finish/" method="POST">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <input type="hidden" name="url" value="{{ .URL }}">
+        <button type="submit" style="display: block; width: 100%;">Finish</button>
+    </form>
+</body>
+</html>
+
+{{ end }}

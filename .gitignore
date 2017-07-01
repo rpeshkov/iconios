@@ -1,3 +1,4 @@
 debug
 vendor/
 storage/
+.DS_Store
